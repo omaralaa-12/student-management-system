@@ -1,13 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.schemas.course import Course
 from app.schemas.student import Student, StudentCreate
 from app.services import student_service
-from app.core.auth import get_current_user
 
 router = APIRouter(
     prefix="/students",
@@ -23,21 +21,30 @@ router = APIRouter(
 )
 def create_student(
     student: StudentCreate,
-    db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     return student_service.create_student(db, student)
 
 
-# Get All Students
+# Get All Students (Search + Pagination)
 @router.get(
     "/",
     response_model=List[Student]
 )
 def get_students(
+    name: Optional[str] = None,
+    major: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    return student_service.get_students(db)
+    return student_service.get_students(
+        db=db,
+        name=name,
+        major=major,
+        skip=skip,
+        limit=limit
+    )
 
 
 # Get Student By ID
@@ -71,8 +78,7 @@ def get_student(
 def update_student(
     student_id: int,
     updated_student: StudentCreate,
-    db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     student = student_service.update_student(
         db,
@@ -96,8 +102,7 @@ def update_student(
 )
 def delete_student(
     student_id: int,
-    db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     deleted = student_service.delete_student(
         db,
@@ -113,53 +118,3 @@ def delete_student(
     return {
         "message": "Student deleted successfully!"
     }
-
-
-# Enroll Student in Course
-@router.post(
-    "/{student_id}/enroll/{course_id}"
-)
-def enroll_student(
-    student_id: int,
-    course_id: int,
-    db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
-):
-    student = student_service.enroll_student_in_course(
-        db,
-        student_id,
-        course_id
-    )
-
-    if student is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Student or Course not found"
-        )
-
-    return {
-        "message": "Student enrolled successfully!"
-    }
-
-
-# Get Courses for a Student
-@router.get(
-    "/{student_id}/courses",
-    response_model=List[Course]
-)
-def get_student_courses(
-    student_id: int,
-    db: Session = Depends(get_db)
-):
-    courses = student_service.get_student_courses(
-        db,
-        student_id
-    )
-
-    if courses is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Student not found"
-        )
-
-    return courses
